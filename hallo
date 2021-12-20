@@ -1,0 +1,48 @@
+const fs = require("fs").promises;
+const sharp = require("sharp"),
+  jimp = require("jimp");
+async function main(file) {
+  let content = await fs.readFile(file, "utf-8");
+  content = content.split(/\r\n/g).map((row) => row.split(",").map(Number));
+  const data = {
+    width: content[0][0],
+    height: content[0][1],
+    pixels: content.slice(1).flat(),
+  };
+  //const arr = new Float32Array()//??
+  await sharp({
+    create: {
+      width: data.width,
+      height: data.height,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
+    },
+  })
+    .png()
+    .toFile("output.png");
+  const output = await jimp.read("output.png");
+  output.scan(0, 0, output.bitmap.width, output.bitmap.height, (x, y, idx) => {
+    const bits = output.bitmap.data;
+    const pixel = Math.floor(idx / 4);
+    const color = toRGBA(data.pixels[pixel]);
+    bits[idx] = color.r;
+    bits[idx + 1] = color.g;
+    bits[idx + 2] = color.b;
+    bits[idx + 3] = 255;
+  });
+ 
+  output.write("output.png");
+}
+main("./example.txt");
+function toRGBA(n) {
+  let hex = n.toString(16);
+  if (hex.length < 6) {
+    hex = "0".repeat(6 - hex.length) + hex;
+  }
+  const result = hex.match(/^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  return {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16),
+  };
+}
